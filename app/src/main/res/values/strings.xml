@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Fire Escape</string>
+    <string name="action_settings">About</string>
+    <string name="dialog_text">
+        Fire Detector and Shortest Path Finder @Engg Student
+    </string>
+    <string name="title_activity_monitor">Monitor Wifi Signal</string>
+</resources>

@@ -1,0 +1,191 @@
+#include <Arduino.h>
+#if defined(ESP32)
+  #include <WiFi.h>
+#elif defined(ESP8266)
+
+  #include <ESP8266WiFi.h>
+#endif
+#include <Firebase_ESP_Client.h>
+#include <Wire.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>  
+#include "addons/TokenHelper.h"
+// Provide the RTDB payload printing info and other helper functions.
+#include "addons/RTDBHelper.h"
+  #define WIFI_SSID "office"
+  #define WIFI_PASSWORD "123456789"
+String timestamp;
+  // Insert Firebase project API Key
+  #define API_KEY "AIzaSyDSXi__zQyOK_bLhPkkXOaJIu6P_cQWOiY"
+
+  // Insert Authorized Email and Corresponding Password
+  #define USER_EMAIL "mausin319@gmail.com"
+  #define USER_PASSWORD "Abc@1234"
+
+  // Insert RTDB URLefine the RTDB URL
+  #define DATABASE_URL "https://fire123-b63f3-default-rtdb.firebaseio.com/"
+
+  // Define Firebase objects
+  FirebaseData fbdo;
+  FirebaseAuth auth;
+  FirebaseConfig config;
+
+  // Variable to save USER UID
+  String uid;
+
+  // Database main path (to be updated in setup with the user UID)
+  String databasePath;
+  // Database child nodes
+
+
+  // Parent Node (to be updated in every loop)
+  String parentPath;
+
+  FirebaseJson json;
+
+  // Define NTP Client to get time
+  WiFiUDP ntpUDP;
+  NTPClient timeClient(ntpUDP, "pool.ntp.org");
+unsigned long sendDataPrevMillis = 0;
+unsigned long timerDelay = 1800;
+
+
+// Initialize BME280
+void initBME(){
+ 
+}
+
+// Initialize WiFi
+void initWiFi() {
+   
+ 
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi ..");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print('.');
+    delay(1000);
+  }
+  Serial.println(WiFi.localIP());
+  Serial.println();
+    //pinMode(LED,OUTPUT);
+}
+
+// Function that gets current epoch time
+unsigned long getTime() {
+  timeClient.update();
+  unsigned long now = timeClient.getEpochTime();
+  return now;
+}
+
+/*
+ * Moisture AO to D12
+ * vcc to D13 3.3v
+ * Ground to gnd
+ * 
+ * Motor Driver + to D14
+ * Motor Driver - to gnd
+ * 
+ * Motor red+ to Driver Motor1 +
+ * Motor black- to Driver motor1 -
+ * 
+ * Adapter + to Driver Power +
+ * Adapter - to Driver Power -
+ * 
+ * 
+ * 
+ * 
+ * MOISTURE More than 3000 (dry land) - Motor ON
+ * MOISTURE Less than 3000 (Wet land) - Motor OFF
+ * 
+ * user input 1 : Motor ON
+ * User input 0 : Motor OFF
+ * 
+ * 
+ */
+
+/*
+fire1 VCC      -  3V3 
+fire1 GND      -  GND
+fire1 OUT      -  D25
+
+fire2 VCC      -  3V3 
+fire2 GND      -  GND
+fire2 OUT      -  D33
+
+*/
+const int fire1Pin = 35;
+const int fire2Pin = 33;
+const int buzzer = 32;
+int fire1;
+int fire2;
+
+
+void setup()
+{
+  Serial.begin(115200);
+  pinMode(fire1Pin, INPUT);
+  pinMode(fire2Pin, INPUT);
+  pinMode(buzzer,OUTPUT);
+ 
+  initWiFi();
+  //timeClient.begin();
+  config.api_key = API_KEY;
+
+  // Assign the user sign in credentials
+  auth.user.email = USER_EMAIL;
+  auth.user.password = USER_PASSWORD;
+
+  // Assign the RTDB URL (required)
+  config.database_url = DATABASE_URL;
+
+Firebase.reconnectWiFi(true);  
+  fbdo.setResponseSize(4096);
+
+  // Assign the callback function for the long running token generation task */
+  config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
+
+  // Assign the maximum retry of token generation
+  config.max_token_generation_retry = 5;
+
+  // Initialize the library with the Firebase authen and config
+  Firebase.begin(&config, &auth);
+
+ 
+
+}
+FirebaseJson json1;
+void loop()
+{
+  fire1 = analogRead(fire1Pin);
+  fire2 = analogRead(fire2Pin);
+
+Serial.print("\tRoom1 = ");
+  Serial.print(fire1);
+  Serial.print("\tRoom2 = ");
+  Serial.print(fire2);
+  
+  if(fire1 >800)
+  {
+      json1.set("fire","one" );
+     Serial.print("one");
+     digitalWrite(buzzer,HIGH);
+  }
+  else
+   if(fire2 >550)
+   {
+     json1.set("fire","two" );
+     Serial.print("two");
+     digitalWrite(buzzer,HIGH);
+   }
+   else{
+     Serial.print("zero");
+     json1.set("fire","zero" );}
+
+parentPath= "/" ;
+    Serial.println("");
+       Firebase.RTDB.getInt(&fbdo, "i");
+  int i = fbdo.intData();
+  json1.set("i",i );
+Serial.printf("Set json... %s\n", Firebase.RTDB.setJSON(&fbdo, parentPath.c_str(), &json1) ? "ok" : fbdo.errorReason().c_str());      
+  delay(1000);
+ }
